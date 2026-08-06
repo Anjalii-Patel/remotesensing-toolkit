@@ -22,7 +22,25 @@ def extract_patches(arr, size, overlap=0, max_nan_frac=0.2):
     return np.stack(P), np.array(X)
 
 def spatial_split(coords, size, ratios=(0.7, 0.15, 0.15), block=1024, seed=0):
-    """Split patches by spatial blocks to avoid train/test leakage. Returns index arrays."""
+    """Split patches by spatial blocks to avoid train/test leakage.
+
+    Why spatial splitting?
+        Randomly splitting adjacent satellite patches produces overly
+        optimistic evaluation because spatially correlated samples appear
+        in both training and test sets (Tobler's First Law of Geography).
+        This function assigns entire spatial *blocks* to a single split,
+        so nearby patches never leak across train / val / test.
+        (Note: patches that straddle block borders may still have minor overlap 
+        with adjacent blocks if extraction uses an overlap parameter).
+
+    Algorithm:
+        1. Map each patch to a coarse grid cell of size *block* pixels.
+        2. Randomly assign each grid cell to train (0), val (1), or test (2)
+           according to *ratios*.
+        3. Return per-patch index arrays for each split.
+
+    Returns list of three index arrays: [train_idx, val_idx, test_idx].
+    """
     ids = np.array([(r // block, c // block) for r, c in coords])
     _, inv = np.unique(ids, axis=0, return_inverse=True)
     inv = inv.ravel(); nb = inv.max() + 1
